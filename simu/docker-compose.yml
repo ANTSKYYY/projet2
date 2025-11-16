@@ -1,0 +1,56 @@
+services:
+  attacker:
+    build:
+      context: ./Docker/attacker
+      dockerfile: Dockerfile
+    container_name: attacker
+    networks:
+      attack_network:
+        ipv4_address: 192.168.1.2
+    tty: true
+    stdin_open: true
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    privileged: true
+    volumes:
+      - ./rockyou-50.txt:/root/rockyou-50.txt
+      - ./attack_handler.sh:/attack_handler.sh
+    entrypoint: ["sh", "-c", "echo '192.168.1.3 victim' >> /etc/hosts && echo '192.168.1.4 machine' >> /etc/hosts && tail -f /dev/null"]
+
+  victim:
+    build:
+      context: ./Docker/victim
+      dockerfile: Dockerfile
+    container_name: victim
+    networks:
+      attack_network:
+        ipv4_address: 192.168.1.3
+    tty: true
+    stdin_open: true
+    cap_add:
+      - NET_ADMIN
+    privileged: true
+    command: ["sh", "-c", "sleep 10 && iptables -P INPUT ACCEPT && echo '192.168.1.2 attacker' >> /etc/hosts && echo '192.168.1.4 machine' >> /etc/hosts && tail -f /dev/null"]
+
+  machine:
+    build:
+      context: ./Docker/machine
+      dockerfile: Dockerfile
+    container_name: machine
+    networks:
+      attack_network:
+        ipv4_address: 192.168.1.4
+    tty: true
+    stdin_open: true
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    command: ["sh", "-c", "echo '192.168.1.2 attacker' >> /etc/hosts && echo '192.168.1.3 victim' >> /etc/hosts && tail -f /dev/null"]
+
+networks:
+  attack_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24
